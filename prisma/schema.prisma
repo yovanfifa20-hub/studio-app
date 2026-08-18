@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  VA
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(VA)
+  createdAt    DateTime @default(now())
+  batches      Batch[]
+}
+
+model Persona {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  notes     String?
+  createdAt DateTime @default(now())
+  batches   Batch[]
+  assets    Asset[]
+}
+
+model Batch {
+  id         String   @id @default(cuid())
+  prompt     String
+  kind       String // "image" | "video"
+  count      Int
+  createdAt  DateTime @default(now())
+  createdBy  User     @relation(fields: [userId], references: [id])
+  userId     String
+  persona    Persona  @relation(fields: [personaId], references: [id])
+  personaId  String
+  assets     Asset[]
+}
+
+model Asset {
+  id           String   @id @default(cuid())
+  url          String
+  kind         String // "image" | "video"
+  prompt       String
+  phash        String? // perceptual hash, image only, for dedup
+  duplicateOf  String? // asset id it duplicates, if flagged
+  createdAt    DateTime @default(now())
+  batch        Batch    @relation(fields: [batchId], references: [id])
+  batchId      String
+  persona      Persona  @relation(fields: [personaId], references: [id])
+  personaId    String
+
+  @@index([personaId, phash])
+}
