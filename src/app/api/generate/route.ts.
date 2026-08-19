@@ -1,0 +1,73 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { generateImage } from "@/lib/wavespeed";
+import { stripImageMetadata } from "@/lib/stripMetadata";
+import { computePerceptualHash, isDuplicate } from "@/lib/dedup";
+import { uploadAsset } from "@/lib/storage";
+
+export async function POST(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Non connecté" }, { status: 401 });
+  }
+
+  const { personaId, prompt, count } = await req.json();
+  if (!personaId || !prompt || !count) {
+    return NextResponse.json({ error: "personaId, prompt et count sont requis" }, { status: 400 });
+  }
+  if (count > 20) {
+    return NextResponse.json({ error: "Maximum 20 images par lot" }, { status: 400 });
+  }
+
+  const persona = await prisma.persona.findUnique({ where: { id: personaId } });
+  if (!persona) return NextResponse.json({ error: "Persona introuvable" }, { status: 404 });
+
+  const batch = await prisma.batch.create({
+    data: {
+      prompt,
+      kind: "image",
+      count,
+      userId: (session.user as any).id,
+      personaId,
+    },
+  });
+
+  // Hashes déjà connus pour cette persona, pour détecter les quasi-doublons
+  const existing = await prisma.asset.findMany({
+    where: { personaId, phash: { not: null } },
+    select: { id: true, phash: true },
+  });
+
+  const created: any[] = [];
+  let duplicatesSkipped = 0;
+  const errors: string[] = [];
+
+  for (let i = 0; i < count; i++) {
+    try {
+      const [rawBuffer] = await generateImage({ prompt, seed: -1 });
+      const cleaned = await stripImageMetadata(rawBuffer);
+      const phash = await computePerceptualHash(cleaned);
+
+      const dupe = existing.find((a) => a.phash && isDuplicate(a.phash, phash));
+      if (dupe) {
+        duplicatesSkipped++;
+        continue;
+      }
+
+      const url = await uploadAsset(cleaned, "image", persona.name.toLowerCase().replace(/\s+/g, "-"));
+
+      const asset = await prisma.asset.create({
+        data: { url, kind: "image", prompt, phash, batchId: batch.id, personaId },
+      });
+
+      existing.push({ id: asset.id, phash });
+      created.push(asset);
+    } catch (e: any) {
+      errors.push(e.message || "Erreur inconnue");
+    }
+  }
+
+  return NextResponse.json({ created, duplicatesSkipped, errors, batchId: batch.id });
+}
