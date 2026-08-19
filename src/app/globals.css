@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #14110f;
+  --surface: #1e1a17;
+  --surface-2: #26211d;
+  --line: #372f28;
+  --text: #ede6dd;
+  --text-muted: #948a7e;
+  --accent: #b0361f; /* rouge inactinique de chambre noire */
+  --accent-soft: #b0361f22;
+  --ok: #6a8f6b;
+  --warn: #c99a3a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body), "IBM Plex Sans", sans-serif;
+  margin: 0;
+}
+
+h1, h2, h3, .display {
+  font-family: var(--font-display), "Fraunces", serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.mono {
+  font-family: var(--font-mono), "IBM Plex Mono", monospace;
+}
+
+/* Perforations de pellicule : le fil conducteur visuel de l'outil,
+   utilisé comme séparateur au-dessus des sections type "planche contact" */
+.sprocket-rule {
+  height: 18px;
+  background-image: radial-gradient(circle, var(--line) 2.5px, transparent 2.6px);
+  background-size: 22px 18px;
+  background-position: center;
+  background-repeat: repeat-x;
+  opacity: 0.8;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
